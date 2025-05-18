@@ -2,7 +2,7 @@ library(httr)
 library(dplyr)
 
 # Remove rows with missing lat and lon values
-bird_events <- bird_events[!is.na(bird_events$lat) & !is.na(bird_events$lon), ]
+bird_events <- bird_events[!is.na(bird_events$latitude) & !is.na(bird_events$longitude), ]
 
 # Convert time columns to POSIXct
 bird_events$start_time <- as.POSIXct(bird_events$start_time, format="%Y-%m-%d %H:%M:%S", tz="UTC")
@@ -69,9 +69,9 @@ for (i in 1:nrow(bird_events)) {
   
   # Check status
   if (!(status_code(response) %in% c(200, 201))) {
-    cat("Error at offset", offset, "status:", status_code(response), "\n")
+    cat("Error at event number", i, "status:", status_code(response), "\n")
     cat("Response content:", content(response, as = "text", type = "application/json"), "\n")
-    break
+    next
   }
   
   data <- content(response, as = "parsed", type = "application/json")
