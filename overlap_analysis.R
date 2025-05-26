@@ -1,6 +1,6 @@
 library(httr)
 library(dplyr)
-library(ggplot2)
+#library(ggplot2)
 library(readr)
 
 # Remove rows with missing lat and lon values
@@ -205,8 +205,11 @@ for (i in 1:nrow(new_all_events)) {
   }
 }
 
-# Percentage of overlapping events
-mean(bird_events$has_overlap) * 100
+# Remove duplicates where same bird event overlaps with same fishing track
+bird_boat_matches_unique <- bird_boat_matches[!duplicated(bird_boat_matches[c("bird_event_id", "boat_id")]), ]
+
+sum(bird_events$event_id %in% bird_boat_matches_unique$bird_event_id) # 182 bird event id's in bird boat matches
+mean(bird_events$event_id %in% bird_boat_matches_unique$bird_event_id) # A proportion of 0.41 of all bird events matched with an AIS boat event 
 
 #### Visual validation of overlapping events
 
@@ -236,33 +239,45 @@ mean(bird_events$has_overlap) * 100
 #   ggtitle("Boat Track vs Bird Event")
 
 
-#### Retrieve accelerometer data
-### LINK IN MAIL + eva voor plot
-## lager dan 0.5 prob niet relevant
-# 
-# library(RPostgres)
-# 
-# # Username
-# user <- 'claire_germ'
-# 
-# # Save password to keychain (only run first time)
-# #keyring::key_set(service='eecology', username=user)
-# 
-# # Get password
-# pw <- keyring::key_get(service='eecology', username=user)
-# 
-# con <- RPostgres::dbConnect(drv=RPostgres::Postgres(), 
-#                             dbname='eecology',
-#                             host='pub.e-ecology.nl',
-#                             user=user, # username
-#                             password=pw) # password 
-# 
-# # dbGetQuery(con, query='SELECT * FROM ... ') # your query
-# 
-# dbDisconnect(con) # disconnect
-
 # Create input.csv for the online bird behavior tool
 input_data <- bird_events[, c("device", "start_time", "end_time")]
 
 # Save data as comma separated file
 write.table(input_data, "input.csv", sep = ",", quote = FALSE, row.names = FALSE, col.names = FALSE)
+
+# Failures.csv contains the device IDs and time ranges that were not found in the database
+# Read failures from bird behavior tool
+failures <- read_csv("bird_behavior_result/failures.csv", col_names = FALSE, show_col_types = FALSE)
+
+# Assign column names manually
+colnames(failures) <- c("device", "start_time", "end_time")
+
+# Create file name strings
+failure_filenames <- paste0(failures$device, "_", format(failures$start_time, "%Y-%m-%d %H:%M:%S"), "_",format(failures$end_time, "%Y-%m-%d %H:%M:%S"), ".csv")
+
+# Loop through bird boat matches
+for (i in 1:nrow(bird_boat_matches_unique)) {
+  # Extract values
+  device <- bird_boat_matches_unique$bird_device[i]
+  start_time <- format(bird_boat_matches_unique$bird_start_time[i], "%Y-%m-%d %H:%M:%S")
+  end_time   <- format(bird_boat_matches_unique$bird_end_time[i], "%Y-%m-%d %H:%M:%S")
+  
+  # Construct file name and path for the bird behavioral tool data
+  file_name <- paste0(device, "_", start_time, "_", end_time, ".csv")
+  file_path <- file.path("bird_behavior_result", file_name)
+  
+  # Check if file exists
+  if (file.exists(file_path)) {
+    # Read csv
+    bird_data <- read_csv(file_path, show_col_types = FALSE)
+    
+    # Analyze/Visualize data here!!!!!!
+    ## lower than 0.5 confidence not relevant
+    
+  } else if (file_name %in% failure_filenames) {
+    message(paste("Skipped file present in failures:", file_name))
+  } else {
+    warning(paste("File not found:", file_name))
+  }
+}
+
