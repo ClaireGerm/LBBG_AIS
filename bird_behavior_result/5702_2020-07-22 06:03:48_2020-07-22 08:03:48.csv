@@ -1,0 +1,4 @@
+device_info_serial,date_time,index,speed_2d,prediction,confidence,latitude,longitude,altitude,temperature,runtime,model
+5702,2020-07-22 07:05:46,0,5.5956,TerLoco,0.91,52.9295835,4.6103354,-6,16.6,2025-05-26 08:32:59,45_best
+5702,2020-07-22 07:37:29,0,9.9938,TerLoco,0.99,52.9259635,4.6276145,-7,15.6,2025-05-26 08:32:59,45_best
+5702,2020-07-22 07:52:26,0,14.1732,ExFlap,1.00,52.9278566,4.6211917,-28,15.3,2025-05-26 08:32:59,45_best
