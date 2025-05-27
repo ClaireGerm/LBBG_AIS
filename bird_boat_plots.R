@@ -41,6 +41,9 @@ for (i in 1:nrow(bird_boat_matches_unique)) {
     # Read csv
     bird_data <- read_csv(file_path, show_col_types = FALSE)
     
+    # Filter for rows where confidence is higher than 0.5
+    bird_data <- bird_data %>% filter(confidence > 0.5)
+    
     # Import associated boat fishing track data
     boat_path <- file.path("Fishing_Tracks", bird_boat_matches_unique$boat_id[i])
     boat_file <- list.files(boat_path, pattern = "\\.csv$", full.names = TRUE)
@@ -105,7 +108,7 @@ for (i in 1:nrow(bird_boat_matches_unique)) {
       geom_segment(data = na.omit(bird_data), aes(x = UTME, y = UTMN, xend = xend, yend = yend), 
                    arrow = arrow(length = unit(0.3, "cm")), color = "black")+
       geom_point(data = bird_data, aes(x = UTME, y = UTMN, fill = prediction), shape = 21, color = "black", size = 3) +
-      scale_color_viridis_c(name = "Boat speed") +
+      scale_color_viridis_c(name = "Boat speed (knots)") +
       custom_colors +
       labs(title = "Bird and Boat Route",
            subtitle = paste("bird device:", device, ", boat id:", bird_boat_matches_unique$boat_id[i], ", time from:", bird_data$date[1], bird_data$time[1], 
