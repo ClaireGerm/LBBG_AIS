@@ -6,6 +6,7 @@ library(terra)
 library(gridExtra)
 library(ggspatial)
 library(viridis)
+library(cowplot)
 
 #### Visual validation of overlapping events
 
@@ -42,7 +43,7 @@ for (i in 1:nrow(bird_boat_matches_unique)) {
     bird_data <- read_csv(file_path, show_col_types = FALSE)
     
     # Filter for rows where confidence is higher than 0.5
-    bird_data <- bird_data %>% filter(confidence > 0.5)
+    bird_data$prediction[bird_data$confidence <= 0.5]<-'Unknown'
     
     # Import associated boat fishing track data
     boat_path <- file.path("Fishing_Tracks", bird_boat_matches_unique$boat_id[i])
@@ -54,6 +55,7 @@ for (i in 1:nrow(bird_boat_matches_unique)) {
     bird_data$counttime <- as.numeric(as.POSIXct(bird_data$date_time))
     bird_data$date <- as.Date(bird_data$date_time)
     bird_data$time <- format(as.POSIXct(bird_data$date_time), format = "%H:%M:%S")
+    bird_data$timestamp <- as.POSIXct(paste(bird_data$date, bird_data$time), format = "%Y-%m-%d %H:%M:%S", tz = "UTC")
     
     # Convert lat lon to UTM
     v_bird <- vect(bird_data, c("longitude", "latitude"), crs = "+proj=longlat")
@@ -72,14 +74,14 @@ for (i in 1:nrow(bird_boat_matches_unique)) {
     # Cap altitude below 0 at 0 and above 50 at 50
     bird_data$altitude <- pmax(0, pmin(50, bird_data$altitude))
     
-    # Add a time buffer
-    time_buffer <- as.difftime(1, units = "hours")
+    # Add a time buffer -> 6 hr buffer
+    time_buffer <- as.difftime(6, units = "hours")
     
     # Create start and end time using time buffer
     start_time <- as.POSIXct(min(bird_data$date_time)) - time_buffer
     end_time <- as.POSIXct(max(bird_data$date_time)) + time_buffer
     
-    # Subset boat data within time frame
+    # Subset boat data within buffered time frame
     boat_df <- subset( boat_df, timestamp >= start_time & timestamp <= end_time)
     
     # Convert boat lat/lon to UTM
@@ -89,72 +91,78 @@ for (i in 1:nrow(bird_boat_matches_unique)) {
     boat_df$UTME <- crds(utm_boat)[, 1]
     boat_df$UTMN <- crds(utm_boat)[, 2]
     
-    # Make plots
     # Custom color for different labels
     myColors <- c("Float" = "blue", "Flap" = "orange", "Soar" = "green", "Boat" = "pink",
                   "Pecking" = "red", "ExFlap" = "purple", "Manouvre" = "cyan",
                   "SitStand" = "darkgreen", "TerLoco" = "brown")
     custom_colors <- scale_fill_manual(name = "prediction", values = myColors)
     
-    # Specify breaks and labels to display
-    custom_breaks <- bird_data$counttime[seq(1, length(bird_data$counttime), by = 10)]
-    custom_labels <- bird_data$time[seq(1, length(bird_data$time), by = 10)]
-    
     bird_data <- bird_data %>% mutate(xend = lead(UTME), yend = lead(UTMN))
-  
-    # Plot 1: Route (bird + boat)
-    Map <- ggplot(na.omit(bird_data)) +
-      geom_path(data = boat_df, aes(x = UTME, y = UTMN, color = speed), size = 1.2) +
-      geom_segment(data = na.omit(bird_data), aes(x = UTME, y = UTMN, xend = xend, yend = yend), 
-                   arrow = arrow(length = unit(0.3, "cm")), color = "black")+
+    
+    # 1. Map
+    Map <- ggplot() +
+      geom_path(data = boat_df, aes(x = UTME, y = UTMN, color = speed), size = 1) +
+      geom_segment(data = bird_data, aes(x = UTME, y = UTMN, xend = xend, yend = yend), na.rm = TRUE, 
+                   arrow = arrow(length = unit(0.2, "cm")), color = "black") +
       geom_point(data = bird_data, aes(x = UTME, y = UTMN, fill = prediction), shape = 21, color = "black", size = 3) +
-      scale_color_viridis_c(name = "Boat speed (knots)") +
-      custom_colors +
-      labs(title = "Bird and Boat Route",
-           subtitle = paste("bird device:", device, ", boat id:", bird_boat_matches_unique$boat_id[i], ", time from:", bird_data$date[1], bird_data$time[1], 
-                            "till", bird_data$date[nrow(bird_data)], bird_data$time[nrow(bird_data)])) +
+      scale_color_viridis_c() + 
+      custom_colors + 
+      labs(title = "Bird and Boat Routes", x = "UTME", y = "UTMN") +
       annotation_scale(location = "br", width_hint = 0.1, plot_unit = "m")
     
-    # Plot 2–5: Altitude, Temperature, Speed, Temp change
-    Altitude <- ggplot(bird_data, aes(x = counttime, y = altitude, fill = prediction)) +
-      geom_point(shape = 21, color = "black", size = 3) + 
-      custom_colors + 
-      scale_x_continuous(breaks = custom_breaks, labels = custom_labels) + 
-      theme(axis.text.x = element_text(angle = 90)) + 
-      ggtitle("Altitude over time")
+    # 2. Latitude over time
+    LatTime <- ggplot(na.omit(bird_data)) +
+      geom_line(data = boat_df, aes(x = timestamp, y = UTMN), color = "darkgrey", size = 1) +
+      geom_point(data = bird_data, aes(x = timestamp, y = UTMN, fill = prediction), shape = 21, color = "black", size = 3) +
+      geom_line(data = bird_data, aes(x = timestamp, y = UTMN), color = "black") +
+      labs(title = "Latitude over Time", x = "Time", y = "UTMN") +
+      custom_colors
     
-    Temperature <- ggplot(bird_data, aes(x = counttime, y = temperature, fill = prediction)) +
-      geom_point(shape = 21, color = "black", size = 3) + 
-      custom_colors + 
-      scale_x_continuous(breaks = custom_breaks, labels = custom_labels) + 
-      theme(axis.text.x = element_text(angle = 90)) + 
-      ggtitle("Temperature over time")
+    # 3. Temperature over time
+    TempTime <- ggplot(na.omit(bird_data), aes(x = timestamp, y = temperature, fill = prediction)) +
+      geom_point(shape = 21, color = "black", size = 3) +
+      labs(title = "Bird Temperature over Time", x = "Time", y = "°C") +
+      custom_colors
+
+    # 4. Longitude vs Time (Time on Y)
+    LonTime <- ggplot(na.omit(bird_data)) +
+      geom_line(data = boat_df, aes(y = timestamp, x = UTME), color = "darkgrey", size = 1, orientation = "y") +
+      geom_point(data = bird_data, aes(y = timestamp, x = UTME, fill = prediction), shape = 21, color = "black", size = 3) +
+      geom_line(data = bird_data, aes(y = timestamp, x = UTME), color = "black", orientation = "y") +
+      labs(title = "Longitude over Time", y = "Time", x = "UTME") +
+      custom_colors
     
-    Speed <- ggplot(na.omit(bird_data), aes(x = counttime, y = speed, fill = prediction)) +
-      geom_point(shape = 21, color = "black", size = 3) + 
-      custom_colors + 
-      scale_x_continuous(breaks = custom_breaks, labels = custom_labels) + 
-      theme(axis.text.x = element_text(angle = 90)) + 
-      ggtitle("Speed (km/h) over time")
+    # 5. Speed over time
+    SpeedTime <- ggplot(na.omit(bird_data), aes(x = timestamp, y = speed, fill = prediction)) +
+      geom_point(shape = 21, color = "black", size = 3) +
+      custom_colors +
+      labs(title = "Bird Speed over Time", x = "Time", y = "Speed (km/h)")
     
-    TempChange <- ggplot(bird_data, aes(x = counttime, y = tempchange, fill = prediction)) +
-      geom_point(shape = 21, color = "black", size = 3) + 
-      custom_colors + 
-      scale_x_continuous(breaks = custom_breaks, labels = custom_labels) + 
-      theme(axis.text.x = element_text(angle = 90)) + 
-      ggtitle("Change in temperature per interval")
+    # 6. Altitude over time
+    AltTime <- ggplot(na.omit(bird_data), aes(x = timestamp, y = altitude, fill = prediction)) +
+      geom_point(shape = 21, color = "black", size = 3) +
+      labs(title = "Bird Altitude over Time", x = "Time", y = "Altitude (m)") +
+      custom_colors
     
-    # Group and arrange smaller plots
-    small_plots <- list(Altitude, Temperature, Speed, TempChange)
-    figure <- grid.arrange(grobs = small_plots, ncol = 2)
+    # Title
+    title_grob <- ggdraw() + draw_label(paste("Bird Device: ", device, ", Boat ID: ",bird_boat_matches_unique$boat_id[i] , ", Time from ",start_time, " till ", end_time), fontface = 'bold', size = 18)
+   
+    # Top row
+    top_row <- plot_grid(Map, LatTime, TempTime, ncol = 3)
+    
+    # Bottom row
+    bottom_row <- plot_grid(LonTime, SpeedTime, AltTime, ncol = 3)
+    
+    # Full layout
+    final_plot <- plot_grid(title_grob, top_row, bottom_row, ncol = 1, rel_heights = c(0.1, 1, 1))
     
     # Save to output
     output_folder <- "behavioral_plots"
     dir.create(output_folder, showWarnings = FALSE)
     output_file <- file.path(output_folder, paste0(gsub("[: ]", "-", device), "_", bird_boat_matches_unique$boat_id[i], "_", start_time, "_", end_time, ".png"))
     
-    png(output_file, width = 1800, height = 800)
-    grid.arrange(Map, figure, ncol = 2)
+    png(output_file, width = 2400, height = 1200)
+    print(final_plot)
     dev.off()
     
   } else if (file_name %in% failure_filenames) {
@@ -163,4 +171,3 @@ for (i in 1:nrow(bird_boat_matches_unique)) {
     warning(paste("File not found:", file_name))
   }
 }
-
