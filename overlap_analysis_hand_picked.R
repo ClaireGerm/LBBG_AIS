@@ -371,6 +371,8 @@ filtered_hand_picked_distances <- distances_hand_picked_df[distances_hand_picked
 # New data frame containing events with more than 1 occurrence in filtered_hand_picked_distances
 real_hand_picked_interactions <- filtered_hand_picked_distances %>% group_by(event_id) %>% filter(n() > 1) %>% ungroup()
 
+length(unique(real_hand_picked_interactions$event_id)) # 8 true interactions events
+
 # Proportion of bird events having a real interaction
 length(unique(real_hand_picked_interactions$event_id))/nrow(bird_events_hand_picked) # proportion of 0.174 events having a true interaction
 

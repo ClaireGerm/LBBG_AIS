@@ -295,5 +295,7 @@ filtered_distances <- distances_df[distances_df$distance_km < 0.05, ]
 # New data frame containing events with more than 1 occurrence in filtered_distances
 real_interactions <- filtered_distances %>% group_by(event_id) %>% filter(n() > 1) %>% ungroup()
 
+length(unique(real_interactions$event_id)) # 48 true interactions events
+
 # Proportion of bird events having a real interaction
-length(unique(real_interactions$event_id))/nrow(bird_events)
+length(unique(real_interactions$event_id))/nrow(bird_events) # proportion of 0.107
