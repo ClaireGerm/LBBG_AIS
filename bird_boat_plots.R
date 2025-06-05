@@ -91,32 +91,38 @@ for (i in 1:nrow(bird_boat_matches_unique)) {
     boat_df$UTME <- crds(utm_boat)[, 1]
     boat_df$UTMN <- crds(utm_boat)[, 2]
     
+    # Convert boat speed from knots to km/h
+    boat_df$speed <- boat_df$speed * 1.852
+    
     # Custom color for different labels
     myColors <- c("Float" = "blue", "Flap" = "orange", "Soar" = "green", "Boat" = "pink",
                   "Pecking" = "red", "ExFlap" = "purple", "Manouvre" = "cyan",
                   "SitStand" = "darkgreen", "TerLoco" = "brown")
-    custom_colors <- scale_fill_manual(name = "prediction", values = myColors)
+    custom_colors <- scale_fill_manual(name = "Bird Prediction", values = myColors)
     
     bird_data <- bird_data %>% mutate(xend = lead(UTME), yend = lead(UTMN))
     
     # 1. Map
     Map <- ggplot() +
-      geom_path(data = boat_df, aes(x = UTME, y = UTMN, color = speed), size = 1) +
+      #geom_path(data = boat_df, aes(x = UTME, y = UTMN, color = speed), size = 1) +
+      geom_path(data = boat_df, aes(x = UTME, y = UTMN, linetype = "Boat Track"), color = "darkgrey", size = 1) +
       geom_segment(data = bird_data, aes(x = UTME, y = UTMN, xend = xend, yend = yend), na.rm = TRUE, 
                    arrow = arrow(length = unit(0.2, "cm")), color = "black") +
       geom_point(data = bird_data, aes(x = UTME, y = UTMN, fill = prediction), shape = 21, color = "black", size = 3) +
-      scale_color_viridis_c() + 
+      #scale_color_viridis_c() + 
       custom_colors + 
+      scale_linetype_manual(name = NULL, values = c("Boat Track" = "solid")) +
       labs(title = "Bird and Boat Routes", x = "UTME", y = "UTMN") +
       annotation_scale(location = "br", width_hint = 0.1, plot_unit = "m")
     
     # 2. Latitude over time
     LatTime <- ggplot(na.omit(bird_data)) +
-      geom_line(data = boat_df, aes(x = timestamp, y = UTMN), color = "darkgrey", size = 1) +
+      geom_line(data = boat_df, aes(x = timestamp, y = UTMN, linetype = "Boat Track"), color = "darkgrey", size = 1) +
       geom_point(data = bird_data, aes(x = timestamp, y = UTMN, fill = prediction), shape = 21, color = "black", size = 3) +
       geom_line(data = bird_data, aes(x = timestamp, y = UTMN), color = "black") +
       labs(title = "Latitude over Time", x = "Time", y = "UTMN") +
-      custom_colors
+      custom_colors +
+      scale_linetype_manual(name = NULL, values = c("Boat Track" = "solid"))
     
     # 3. Temperature over time
     TempTime <- ggplot(na.omit(bird_data), aes(x = timestamp, y = temperature, fill = prediction)) +
@@ -126,17 +132,22 @@ for (i in 1:nrow(bird_boat_matches_unique)) {
 
     # 4. Longitude vs Time (Time on Y)
     LonTime <- ggplot(na.omit(bird_data)) +
-      geom_line(data = boat_df, aes(y = timestamp, x = UTME), color = "darkgrey", size = 1, orientation = "y") +
+      geom_line(data = boat_df, aes(y = timestamp, x = UTME, linetype = "Boat Track"), color = "darkgrey", size = 1, orientation = "y") +
       geom_point(data = bird_data, aes(y = timestamp, x = UTME, fill = prediction), shape = 21, color = "black", size = 3) +
       geom_line(data = bird_data, aes(y = timestamp, x = UTME), color = "black", orientation = "y") +
       labs(title = "Longitude over Time", y = "Time", x = "UTME") +
-      custom_colors
+      custom_colors +
+      scale_linetype_manual(name = NULL, values = c("Boat Track" = "solid"))
     
     # 5. Speed over time
-    SpeedTime <- ggplot(na.omit(bird_data), aes(x = timestamp, y = speed, fill = prediction)) +
-      geom_point(shape = 21, color = "black", size = 3) +
+    SpeedTime <- ggplot() +
+      geom_point(data = na.omit(bird_data), aes(x = timestamp, y = speed, fill = prediction), 
+                 shape = 21, color = "black", size = 3) +
+      geom_line(data = boat_df, aes(x = timestamp, y = speed, linetype = "Boat Track"), color = "darkgrey", size = 1) +
       custom_colors +
-      labs(title = "Bird Speed over Time", x = "Time", y = "Speed (km/h)")
+      scale_linetype_manual(name = NULL, values = c("Boat Track" = "solid")) +
+      labs(title = "Bird and Boat Speed over Time", x = "Time", y = "Speed (km/h)")
+    
     
     # 6. Altitude over time
     AltTime <- ggplot(na.omit(bird_data), aes(x = timestamp, y = altitude, fill = prediction)) +
@@ -145,16 +156,19 @@ for (i in 1:nrow(bird_boat_matches_unique)) {
       custom_colors
     
     # Title
-    title_grob <- ggdraw() + draw_label(paste("Bird Device: ", device, ", Boat ID: ",bird_boat_matches_unique$boat_id[i] , ", Time from ",start_time, " till ", end_time), fontface = 'bold', size = 18)
+    #title_grob <- ggdraw() + draw_label(paste("Bird Device: ", device, ", Boat ID: ",bird_boat_matches_unique$boat_id[i] , ", Time from ",start_time, " till ", end_time), fontface = 'bold', size = 18)
    
     # Top row
-    top_row <- plot_grid(Map, LatTime, TempTime, ncol = 3)
+    top_row <- plot_grid(Map, LatTime, TempTime, ncol = 3, labels = c("A", "B", "C"),
+                         label_size = 16, label_fontface = "bold", label_x = 0, label_y = 1 )    
     
     # Bottom row
-    bottom_row <- plot_grid(LonTime, SpeedTime, AltTime, ncol = 3)
+    bottom_row <- plot_grid(LonTime, SpeedTime, AltTime, ncol = 3,
+                            labels = c("D", "E", "F"), label_size = 16, label_fontface = "bold", label_x = 0, label_y = 1)
     
     # Full layout
-    final_plot <- plot_grid(title_grob, top_row, bottom_row, ncol = 1, rel_heights = c(0.1, 1, 1))
+    #final_plot <- plot_grid(title_grob, top_row, bottom_row, ncol = 1, rel_heights = c(0.1, 1, 1))
+    final_plot <- plot_grid(top_row, bottom_row, ncol = 1, rel_heights = c(1, 1))
     
     # Save to output
     output_folder <- "behavioral_plots"
