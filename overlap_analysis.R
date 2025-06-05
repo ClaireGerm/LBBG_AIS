@@ -209,3 +209,92 @@ bird_boat_matches_unique <- bird_boat_matches[!duplicated(bird_boat_matches[c("b
 
 sum(bird_events$event_id %in% bird_boat_matches_unique$bird_event_id) # 182 bird event id's in bird boat matches
 mean(bird_events$event_id %in% bird_boat_matches_unique$bird_event_id) # A proportion of 0.41 of all bird events matched with an AIS boat event 
+
+
+#### Approximate distances between bird and boat
+
+all_distances <- list()
+event_id <- 1
+
+# Loop over unique bird boat matches
+for (i in 1:nrow(bird_boat_matches_unique)) {
+  # Extract event data
+  device <- bird_boat_matches_unique$bird_device[i]
+  boat <- bird_boat_matches_unique$boat_id[i]
+  start_time <- bird_boat_matches_unique$bird_start_time[i]
+  end_time <- bird_boat_matches_unique$bird_end_time[i]
+  
+  # Import bird data
+  file_name <- paste0(device, "_", start_time, "_", end_time, ".csv")
+  file_path <- file.path("bird_behavior_result", file_name)
+  
+  # Check if bird data file exists
+  if (file.exists(file_path)) {
+    bird_data <- read_csv(file_path, show_col_types = FALSE)
+  
+    # Import associated boat fishing track data
+    boat_path <- file.path("Fishing_Tracks", bird_boat_matches_unique$boat_id[i])
+    boat_file <- list.files(boat_path, pattern = "\\.csv$", full.names = TRUE)
+    boat_df <- read_csv(boat_file, show_col_types = FALSE)
+    boat_df$timestamp <- as.POSIXct(boat_df$timestamp, format = "%Y-%m-%dT%H:%M:%OSZ", tz = "UTC")
+  
+    # Subset boat data within time frame
+    boat_df <- subset( boat_df, timestamp >= start_time & timestamp <= end_time)
+  
+    # Estimate boat lat/lon at bird time points
+    bird_data$date_time <- as.POSIXct(bird_data$date_time, tz = "UTC")
+    lat_boat_approx <- approx(x = as.numeric(boat_df$timestamp), y = boat_df$lat, xout = as.numeric(bird_data$date_time), method = "linear", na.rm = TRUE, rule = 2)$y
+    lon_boat_approx <- approx(x = as.numeric(boat_df$timestamp), y = boat_df$lon, xout = as.numeric(bird_data$date_time), method = "linear", na.rm = TRUE, rule = 2)$y
+  
+    # Computation of distance using haversine formula
+    distances <- mapply(
+      haversine,
+      lat1 = bird_data$latitude,
+      lon1 = bird_data$longitude,
+      lat2 = lat_boat_approx,
+      lon2 = lon_boat_approx
+    )
+  
+    # Store results
+    result_df <- data.frame(
+      event_id = event_id,
+      bird_device = device,
+      boat_id = boat,
+      time = bird_data$date_time,
+      bird_lat = bird_data$latitude,
+      bird_lon = bird_data$longitude,
+      boat_lat_approx = lat_boat_approx,
+      boat_lon_approx = lon_boat_approx,
+      distance_km = distances
+    )
+  
+    # Append results to all_distances
+    all_distances[[length(all_distances) + 1]] <- result_df
+    
+    event_id <- event_id + 1
+    
+  } else if (file_name %in% failure_filenames) {
+    message(paste("Skipped file present in failures:", file_name))
+  } else {
+    warning(paste("File not found:", file_name))
+  }
+}
+
+# Combine into one data frame
+distances_df <- do.call(rbind, all_distances)
+
+# View
+head(distances_df)
+
+# Determine within what distance we're observing a true interaction
+hist(distances_df$distance_km[distances_df$distance_km<0.2], 100, main = "", xlab = "Distance (km)")
+
+# Create data frame using distance buffer of 50 meters (based on histogram peak)
+filtered_distances <- distances_df[distances_df$distance_km < 0.05, ]
+
+# New data frame containing events with more than 1 occurrence in filtered_distances
+real_interactions <- filtered_distances %>% group_by(event_id) %>% filter(n() > 1) %>% ungroup()
+
+# Proportion of bird events having a real interaction
+length(unique(real_interactions$event_id))/nrow(bird_events)
+
