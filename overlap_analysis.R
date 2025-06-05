@@ -297,4 +297,3 @@ real_interactions <- filtered_distances %>% group_by(event_id) %>% filter(n() > 
 
 # Proportion of bird events having a real interaction
 length(unique(real_interactions$event_id))/nrow(bird_events)
-

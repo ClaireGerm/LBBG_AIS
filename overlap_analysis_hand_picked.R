@@ -245,8 +245,8 @@ for (i in 1:nrow(new_all_events_hand_picked)) {
   track_csv$timestamp <- as.POSIXct(track_csv$timestamp, format = "%Y-%m-%dT%H:%M:%OSZ", tz = "UTC")
   
   # Loop over boat following events in bird_events
-  for (i in 1:nrow(bird_events_hand_picked)) {
-    b <- bird_events_hand_picked[i, ]
+  for (j in 1:nrow(bird_events_hand_picked)) {
+    b <- bird_events_hand_picked[j, ]
     
     # Expand bird event time window by + and - 1 hour
     buffered_start <- b$`Start time` - time_buffer
@@ -372,6 +372,6 @@ filtered_hand_picked_distances <- distances_hand_picked_df[distances_hand_picked
 real_hand_picked_interactions <- filtered_hand_picked_distances %>% group_by(event_id) %>% filter(n() > 1) %>% ungroup()
 
 # Proportion of bird events having a real interaction
-length(unique(real_hand_picked_interactions$event_id))/nrow(bird_events_hand_picked) # proportion of 0.174 events have a true interaction
+length(unique(real_hand_picked_interactions$event_id))/nrow(bird_events_hand_picked) # proportion of 0.174 events having a true interaction
 
 
