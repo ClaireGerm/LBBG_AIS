@@ -159,12 +159,10 @@ for (i in 1:nrow(bird_boat_matches_unique)) {
     #title_grob <- ggdraw() + draw_label(paste("Bird Device: ", device, ", Boat ID: ",bird_boat_matches_unique$boat_id[i] , ", Time from ",start_time, " till ", end_time), fontface = 'bold', size = 18)
    
     # Top row
-    top_row <- plot_grid(Map, LatTime, TempTime, ncol = 3, labels = c("A", "B", "C"),
-                         label_size = 16, label_fontface = "bold", label_x = 0, label_y = 1 )    
+    top_row <- plot_grid(Map, LatTime, TempTime, ncol = 3, labels = c("A", "B", "C"), label_size = 18, label_fontface = "bold", label_x = 0, label_y = 1 )    
     
     # Bottom row
-    bottom_row <- plot_grid(LonTime, SpeedTime, AltTime, ncol = 3,
-                            labels = c("D", "E", "F"), label_size = 16, label_fontface = "bold", label_x = 0, label_y = 1)
+    bottom_row <- plot_grid(LonTime, SpeedTime, AltTime, ncol = 3, labels = c("D", "E", "F"), label_size = 18, label_fontface = "bold", label_x = 0, label_y = 1)
     
     # Full layout
     #final_plot <- plot_grid(title_grob, top_row, bottom_row, ncol = 1, rel_heights = c(0.1, 1, 1))
