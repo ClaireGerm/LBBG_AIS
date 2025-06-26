@@ -1,3 +1,5 @@
+[![DOI](https://zenodo.org/badge/984969476.svg)](https://doi.org/10.5281/zenodo.15743783)
+
 This repository contains code and data for analyzing discrepancies between GPS-tracked bird data and AIS-registered fishing activity for the detection of potential unreported fishing activity.
 
 ## License
